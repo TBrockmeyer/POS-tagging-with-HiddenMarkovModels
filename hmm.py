@@ -68,7 +68,7 @@ def create_model_file (text_file, model_name):
         w, h = len(tag_list_2), len(tag_list_1);
         # Create a Matrix for counting transitions between all tags:
         # (Add-One smoothing already considered, by creating a matrix of ones)
-        tag_tag_list = [[1 for x in range(w)] for y in range(h)]
+        tag_tag_list = [[0 for x in range(w)] for y in range(h)]
         # Create an empty list for counting all occurences of the first tuple elements
         # (we will need these counts for calculating P(T_i|T_(i-1)) later)
         tag_list_1_counts = [len(tag_list_1) for x in range(h)]
@@ -103,6 +103,22 @@ def create_model_file (text_file, model_name):
         # Package tag_tag_list and tag_list_1_counts into one output list
         output_list_tags = [tag_tag_list, tag_list_1_counts, tag_list_2_counts]
         return output_list_tags
+
+    # Method for adding 1 to every sublist element in a list of lists
+    def add_one_to_every_sublist_element (list_of_lists):
+        # Determine whether list_of_lists is really a list of lists:
+        lol_indicator = any(isinstance(el, list) for el in list_of_lists)
+        if (lol_indicator == True):
+            w, h = len(list_of_lists[0]), len(list_of_lists);
+            # Add-One smoothing (adding 1 to every sublist element)
+            for d in range (0, h):
+                for e in range (0, w):
+                    list_of_lists[d][e] = list_of_lists[d][e] + 1
+        else:
+            w = len(list_of_lists)
+            for e in range (0, w):
+                list_of_lists[e] = list_of_lists[e] + 1
+        return list_of_lists
 
     # Method for creating a list of emissions or states tags from a given list of tuples
     # The list will be a one-each representation of all elements occurring
@@ -153,6 +169,7 @@ def create_model_file (text_file, model_name):
     # The function allows both variants
 
     def calculate_log_cond_probabilities (counts_matrix, where_conditionals, summed_conditionals):
+        # TODO: delete print ("summed_conditionals (word-tag_list): ", summed_conditionals)
         # Prepare later index allocation of summed_conditionals
         cond_in_rows = 1
         cond_in_columns = 1
@@ -173,6 +190,10 @@ def create_model_file (text_file, model_name):
                     #   if in the columns, it does change with every j
                     current_sums_index = i*cond_in_rows+j*cond_in_columns
                     probability = counts_matrix[i][j] / summed_conditionals[current_sums_index]
+                    # TODO: delete 3 lines below
+                    #if (i == 6652 or i == 11546):
+                    #    print ("probability = counts_matrix[i][j] / summed_conditionals[",current_sums_index,"], :")
+                    #    print ("", probability, " = ", counts_matrix[i][j], "/", summed_conditionals[current_sums_index])
                     log_probability = math.log(probability)
                     probabilities_matrix[i][j] = log_probability
         except TypeError:
@@ -200,8 +221,8 @@ def create_model_file (text_file, model_name):
     emission_state_pairs_list = delete_linebreak_in_sublists (emission_state_pairs_list)
 
     # Show a sample range of emission-state pairs
-    for a in range (0, 300):
-        print ("Emission w/wo tag: ", emission_state_pairs_list[a], "; Length:", len(emission_state_pairs_list[a]))
+    #for a in range (0, 300):
+    #    print ("Emission w/wo tag: ", emission_state_pairs_list[a], "; Length:", len(emission_state_pairs_list[a]))
 
     ### print ("")
 
@@ -254,12 +275,18 @@ def create_model_file (text_file, model_name):
     tag_tag_package = create_2D_list_from_tuple_list (state_state_pairs_list, tag_list, tag_list)
     #   Matrix of tag-tag transition counts
     tag_tag_list = tag_tag_package[0]
+    #       Add-one-smoothing:
+    tag_tag_list = add_one_to_every_sublist_element (tag_tag_list)
     #   Accumulated occurences of first element (tags)
     tag_1_counts = tag_tag_package[1]
+    #       Add-one-smoothing:
+    tag_1_counts = add_one_to_every_sublist_element (tag_1_counts)
     #   Accumulated occurences of second element (tags)
     tag_2_counts = tag_tag_package[2]
+    #       Add-one-smoothing:
+    tag_2_counts = add_one_to_every_sublist_element (tag_2_counts)
 
-    ### print (tag_tag_list[0:9])
+
     ### print ("tag_1_counts", tag_1_counts)
     ### print ("tag_2_counts", tag_2_counts)
 
@@ -299,20 +326,26 @@ def create_model_file (text_file, model_name):
     #   Accumulated occurences of second element (tags)
     tag_word_counts = word_tag_package[2]
 
+    # TODO: delete 4 lines below
     ### print (word_tag_list[4630:4640])
+    ### print ("word_tag_list[6652]", word_tag_list[6652])
+    ### print ("word_tag_list[11546]", word_tag_list[11546])
     ### print ("tag_word_counts", tag_word_counts)
 
     ### print ("")
 
     # Create matrix of (conditional) emission probabilities
     emission_probabilities = calculate_log_cond_probabilities (word_tag_list, "columns", tag_word_counts)
-    ### print ("emission_probabilities[4630:4640]: ", emission_probabilities[4630:4640])
+    ### print ("emission_probabilities[6652]: ", emission_probabilities[6652], "...")
+    ### print ("emission_probabilities[11546]: ", emission_probabilities[11546], "...")
 
     ### print ("")
 
     ################ Compression of elements necessary for HMM to a compressed file "model.npz"
 
     # compressing code adapted from https://docs.python.org/3/library/lzma.html#examples
+
+    # Prepare compressed file for HMM calculations:
     # Prepare adding data to compressed file:
     #   List with all valid states
     out1 = tag_list
@@ -325,6 +358,109 @@ def create_model_file (text_file, model_name):
     # Compress data
     np.savez_compressed(model_name, out1, out2, out3, out4)
 
+    # Prepare compressed file for checking counts and how probabilities may have been calculated:
+    # Prepare adding data to compressed file:
+    out21 = out1
+    out22 = out3
+    out23 = word_tag_list
+    out24 = tag_word_counts
+    out25 = word_counts
+    np.savez_compressed('compressed_file_counts.npz', out21, out22, out23, out24, out25)
+
+def classify_sentence_with_model (model_name, sentence):
+    # Define viterbi algorithm
+    # code from https://gist.github.com/nkt1546789/fa238a168c2c2f84babce71f9f5d5ccd
+    def viterbi(P, A):
+        """
+        P: log probability matrix (n_samples by n_states)
+        A: log transition probability matrix (n_states by n_states)
+        """
+        # n_samples is the number of words
+        n_samples = P.shape[0]
+        # print ("n_samples = ", n_samples)
+        # states is an array, with the ascending numbers of 1 to the number of states as elements: [1 2 3 ... n_states]
+        states = np.arange(P.shape[1])
+        len_states = len(states)
+
+        V = np.zeros((n_samples, len_states))
+        S = np.zeros((n_samples, len_states), dtype=int)
+        print ("tag_list[3]: ", tag_list[3], "\nA[3]: ", A[3])
+        V[0] = P[0] + A[3]
+        # V[0] = P[0]
+
+        print ("P: \n", P)
+        print ("A: \n", A)
+
+        for t in range(1, n_samples):
+            print ("-----t: ", t)
+            values = V[t-1] + A
+            # print ("-----values: \n", values)
+            S[t-1] = np.argmax(values, axis=1)
+            print ("-----P[t]: \n", P[t])
+            V[t] = P[t] + np.max(values, axis=1)
+            print ("-----V[t]: \n", V[t])
+
+        y = np.zeros(n_samples, dtype=int)
+        y[-1] = V[-1].argmax()
+        for t in range(2, n_samples+1):
+            y[-t] = S[-t, y[-t+1]]
+        return y
+
+    # Get data from compressed file:
+    model_name_npz = model_name[0]
+    loaded = np.load(model_name_npz)
+    #   List with all valid states
+    tag_list = loaded['arr_0']
+    #   Matrix with transition probabilities
+    transition_probabilities = loaded['arr_1']
+    #   List with all valid emissions
+    word_list = loaded['arr_2']
+    #   Matrix with emission probabilities
+    emission_probabilities = loaded['arr_3']
+    #   Add
+    #       an element 'unknown emission' to word_list
+    word_list = np.append(word_list, ['unknown_emission'])
+    #       and a line with values (1)/(1+number_of_known_emissions) and shape[0] = number_of_states to emission_probabilities
+    marginal_probability = emission_probabilities.shape[1]*[1/(1+emission_probabilities.shape[0])]
+    print ("emission_probabilities.shape[0] (aka. number of unique words): ", emission_probabilities.shape[0])
+    print ("marginal_probability: ", marginal_probability)
+    emission_probabilities = np.append(emission_probabilities, [marginal_probability], axis=0)
+
+    print ("tag_list: \n", tag_list)
+
+    # URGENT TODO: create an emission_probabilities_sentence matrix that only contains the emission probs for the words analyzed
+    # then conduct viterbi only on this matrix
+    # for creating emission_probabilities_sentence,
+    #   determine indices of all words in sentence and add relevant lines of emission_probabilities to emission_probabilities_sentence
+    sentence_split = sentence.split()
+    print ("sentence_split: ", sentence_split)
+    emission_probabilities_sentence = []
+    for b in range (0, len(sentence_split)):
+        # determine index of current word in emission_probabilities, i.e. in word_list
+        print ("sentence_split[", b, "]: ", sentence_split[b])
+        #print ("word_list: ", word_list[0:4])
+        word_index = np.where(word_list == sentence_split[b])
+        print ("word_index[0]: ", word_index[0])
+        if (len(word_index[0]) == 0):
+            word_index = np.where(word_list == 'unknown_emission')
+        emission_probabilities_sentence.append(emission_probabilities[word_index[0][0]])
+    emission_probabilities_sentence = np.array(emission_probabilities_sentence)
+    # print ("emission_probabilities_sentence: ", emission_probabilities_sentence)
+
+    # Conduct viterbi with given parameters
+    ##### viterbi_result = 'placeholder viterbi_result'
+    viterbi_result = viterbi(emission_probabilities_sentence, transition_probabilities)
+    print ("viterbi_result = ", viterbi_result)
+    viterbi_result_tags = []
+    for c in range (0, len(viterbi_result)):
+        # Find tag corresponding to state number
+        print ("viterbi_result[c]: ", type(viterbi_result[c]))
+        tag_index_corresp = viterbi_result[c]
+        tag_corresp_state = tag_list[tag_index_corresp]
+        viterbi_result_tags.append(tag_corresp_state)
+
+    return viterbi_result_tags
+
 ################ Allow command-line interface:
 # "python hmm.py –train training_pos.txt model.npz" invokes the creation of the "model.npz" file with the data necessary for HMM
 # "python hmm.py –classify model.npz "Wir rennen oft zum Bus . <or any other sentence>" invokes an output of the form
@@ -334,6 +470,7 @@ def create_model_file (text_file, model_name):
 # TODO: implement case differentiation: -train | -classify
 # argparse, according to https://docs.python.org/3/library/argparse.html
 
+# definition to check whether argument at position 2 (after the 'train'/'classify' decision is a .txt-file name
 def some_string(string):
     global opt1
     opt1 = False
@@ -351,21 +488,29 @@ def some_string(string):
         print("opt2")
         # args.cmd_string is then the name of a compressed model file
         given_modelfile = string.split()
+# Creation of a parser to expect arguments in command line
 parser = argparse.ArgumentParser(description='Invoke either model.npz creation or classify given sentence')
 parser.add_argument('cmd_choice')
 parser.add_argument('cmd_string', type=some_string)
 parser.add_argument('cmd_third')
 args = parser.parse_args()
+# Invoke definitions according to given arguments
 if(opt1==True and args.cmd_choice == 'train'):
     given_modelname = args.cmd_third
+    given_textfile = given_textfile[0]
     print ("given_textfile", given_textfile)
     print ("given_modelname", given_modelname)
+    # Invoke model creation
+    create_model_file (given_textfile, given_modelname)
 elif(opt2==True and args.cmd_choice == 'classify'):
     given_sentence = args.cmd_third
     print ("given_modelfile", given_modelfile)
     print ("given_sentence", given_sentence)
+    # Invoke classification definition
+    viterbi_result = classify_sentence_with_model (given_modelfile, given_sentence)
+    print ("viterbi_result", viterbi_result)
 else:
-    print ("Something went wrong. Please check command for formats <> or <>")
+    print ("Something went wrong. Please check command for formats: Either\n<train text_file_name.txt model_name> or\n<classify existing_model_name 'sentence to be analyzed'>")
 # add_argument with command to be processed
 """
 parser1.add_argument(

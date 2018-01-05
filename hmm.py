@@ -67,8 +67,55 @@ def create_model_file (text_file, model_name):
         # Instead of using manually defined STTS tags, use a tag set given to this function as an input: Hi
         w, h = len(tag_list_2), len(tag_list_1);
         # Create a Matrix for counting transitions between all tags:
-        # (Add-One smoothing already considered, by creating a matrix of ones)
         tag_tag_list = [[0 for x in range(w)] for y in range(h)]
+        # Create an empty list for counting all occurences of the first tuple elements
+        # (we will need these counts for calculating P(T_i|T_(i-1)) later)
+        tag_list_1_counts = [0 for x in range(h)]
+        tag_list_2_counts = [0 for z in range(w)]
+        # Go through the whole input list and
+        #   increase value at position of tag tuple_list[i][0], tuple_list[i][1]
+        #   catch error if list has not "list-of-tuple-sublists" format
+        # TODO: also catch StopIteration error if element not found, as described in link
+        try:
+            for i in range (0, len(tuple_list)):
+                # If currently analyzed tuple consists of two elements
+                # (because we do not want to count any single elements,
+                # which do not provide a base for emission or transition probabilities)
+                if (len(tuple_list[i]) == 2):
+                    # Find index of first and second tag
+                    first_tag_index = tag_list_1.index(tuple_list[i][0])
+                    second_tag_index = tag_list_2.index(tuple_list[i][1])
+                    # Add count to corresponding entry in tag_tag_list
+                    tag_tag_list[first_tag_index][second_tag_index] += 1
+                    # Add count to corresponding entry in tag_list_1_counts
+                    tag_list_1_counts[first_tag_index] += 1
+                    tag_list_2_counts[second_tag_index] += 1
+        # An error exception is thrown if an element looked for cannot be found. For-loop continues then with "pass"
+        except StopIteration:
+            # ### print ("Error in <create_dict_list_from_tuple_list>: Searched element not found in list")
+            pass
+        # Error exceptions are thrown if given type is not a valid two-dimensional element
+        except TypeError:
+            print ("Error in <create_dict_list_from_tuple_list>: The input element seems to be invalid. Needs to be a two-dimensional list of sublists, e.g. [['abc','def\n'],['ghi','jkl']]")
+        except AttributeError:
+            print ("Error in <create_dict_list_from_tuple_list>: The input element seems to be invalid. Needs to be a two-dimensional list of sublists, e.g. [['abc','def\n'],['ghi','jkl']]")
+        # Package tag_tag_list and tag_list_1_counts into one output list
+        output_list_tags = [tag_tag_list, tag_list_1_counts, tag_list_2_counts]
+        return output_list_tags
+
+    # Method for creating a 2D-list ... WITH Add-One Smoothing
+    def create_2D_list_from_tuple_list_w_AOS (tuple_list, tag_list_1, tag_list_2):
+        # (Abandoned:
+        # Create a list with STTS tags
+        # This list serves for providing indices of tags so that the corresponding values
+        # will be written into the right row and column of the 2D-"tag_tag_list"
+        # stts_tags = ['<s', 'ADJA', 'ADJD', 'ADV', 'APPR', 'APPRART', 'APPO', 'APZR', 'ART', 'CARD', 'FM', 'ITJ', 'KOUI', 'KOUS', 'KON', 'KOKOM', 'NN', 'NE', 'PDS', 'PDAT', 'PIS', 'PIAT', 'PIDAT', 'PPER', 'PPOSS', 'PPOSAT', 'PRELS', 'PRELAT', 'PRF', 'PWS', 'PWAT', 'PWAV', 'PAV', 'PTKZU', 'PTKNEG', 'PTKVZ', 'PTKANT', 'PTKA', 'TRUNC', 'VVFIN', 'VVIMP', 'VVINF', 'VVIZU', 'VVPP', 'VAFIN', 'VAIMP', 'VAINF', 'VAPP', 'VMFIN', 'VMINF', 'VMPP', 'XY', '$,', '$.', '$(']
+        # )
+        # Instead of using manually defined STTS tags, use a tag set given to this function as an input: Hi
+        w, h = len(tag_list_2), len(tag_list_1);
+        # Create a Matrix for counting transitions between all tags:
+        # (Add-One smoothing already considered, by creating a matrix of ones)
+        tag_tag_list = [[1 for x in range(w)] for y in range(h)]
         # Create an empty list for counting all occurences of the first tuple elements
         # (we will need these counts for calculating P(T_i|T_(i-1)) later)
         tag_list_1_counts = [len(tag_list_1) for x in range(h)]
@@ -189,11 +236,20 @@ def create_model_file (text_file, model_name):
                     #   if the conditionals are in the rows, the index does not change while i doesn't change
                     #   if in the columns, it does change with every j
                     current_sums_index = i*cond_in_rows+j*cond_in_columns
-                    probability = counts_matrix[i][j] / summed_conditionals[current_sums_index]
+                    # If summed_conditionals[current_sums_index] is == 0, calculate a marginal probability: 1/(1+h)
+                    #   in case of e.g. a long list of words as emissions, this is equivalent to (1)/(1+number_of_known_emissions)
+                    if (summed_conditionals[current_sums_index] == 0):
+                        probability = 1/(1+h)
+                    else:
+                        probability = counts_matrix[i][j] / summed_conditionals[current_sums_index]
                     # TODO: delete 3 lines below
                     #if (i == 6652 or i == 11546):
                     #    print ("probability = counts_matrix[i][j] / summed_conditionals[",current_sums_index,"], :")
                     #    print ("", probability, " = ", counts_matrix[i][j], "/", summed_conditionals[current_sums_index])
+                    # If probability is == 0, calculate a marginal probability: 1/(1+h)
+                    #   in case of e.g. a long list of words as emissions, this is equivalent to (1)/(1+number_of_known_emissions)
+                    if (probability == 0):
+                        probability = 1/(1+h)
                     log_probability = math.log(probability)
                     probabilities_matrix[i][j] = log_probability
         except TypeError:
@@ -272,19 +328,13 @@ def create_model_file (text_file, model_name):
     # and the accumulated occurences of first element tags (tag_list_1_counts)
     # tag_list_1 was given to the function as key-list for both condition and events
     # (spoken in conditional probability terminology)
-    tag_tag_package = create_2D_list_from_tuple_list (state_state_pairs_list, tag_list, tag_list)
+    tag_tag_package = create_2D_list_from_tuple_list_w_AOS (state_state_pairs_list, tag_list, tag_list)
     #   Matrix of tag-tag transition counts
     tag_tag_list = tag_tag_package[0]
-    #       Add-one-smoothing:
-    tag_tag_list = add_one_to_every_sublist_element (tag_tag_list)
     #   Accumulated occurences of first element (tags)
     tag_1_counts = tag_tag_package[1]
-    #       Add-one-smoothing:
-    tag_1_counts = add_one_to_every_sublist_element (tag_1_counts)
     #   Accumulated occurences of second element (tags)
     tag_2_counts = tag_tag_package[2]
-    #       Add-one-smoothing:
-    tag_2_counts = add_one_to_every_sublist_element (tag_2_counts)
 
 
     ### print ("tag_1_counts", tag_1_counts)
@@ -318,13 +368,14 @@ def create_model_file (text_file, model_name):
     # and the accumulated occurences of first element tags (tag_list_1_counts)
     # tag_list_1 was given to the function as key-list for both condition and events
     # (spoken in conditional probability terminology)
-    word_tag_package = create_2D_list_from_tuple_list (emission_state_pairs_list, word_list, tag_list)
+    word_tag_package = create_2D_list_from_tuple_list_w_AOS (emission_state_pairs_list, word_list, tag_list)
     #   Matrix of word-tag emission counts
     word_tag_list = word_tag_package[0]
     #   Accumulated occurences of first element (words)
     word_counts = word_tag_package[1]
     #   Accumulated occurences of second element (tags)
     tag_word_counts = word_tag_package[2]
+
 
     # TODO: delete 4 lines below
     ### print (word_tag_list[4630:4640])
@@ -402,6 +453,9 @@ def classify_sentence_with_model (model_name, sentence):
 
         y = np.zeros(n_samples, dtype=int)
         y[-1] = V[-1].argmax()
+        print ("V[-1].max(): ", V[-1].max())
+        Vindex = V[-1].argmax()
+        print ("Location of argmax in V[-1]: ", Vindex , "; value:", V[-1][Vindex])
         for t in range(2, n_samples+1):
             y[-t] = S[-t, y[-t+1]]
         return y

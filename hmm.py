@@ -368,7 +368,7 @@ def create_model_file (text_file, model_name):
     # and the accumulated occurences of first element tags (tag_list_1_counts)
     # tag_list_1 was given to the function as key-list for both condition and events
     # (spoken in conditional probability terminology)
-    word_tag_package = create_2D_list_from_tuple_list_w_AOS (emission_state_pairs_list, word_list, tag_list)
+    word_tag_package = create_2D_list_from_tuple_list (emission_state_pairs_list, word_list, tag_list)
     #   Matrix of word-tag emission counts
     word_tag_list = word_tag_package[0]
     #   Accumulated occurences of first element (words)
@@ -386,7 +386,8 @@ def create_model_file (text_file, model_name):
     ### print ("")
 
     # Create matrix of (conditional) emission probabilities
-    emission_probabilities = calculate_log_cond_probabilities (word_tag_list, "columns", tag_word_counts)
+    # emission_probabilities = calculate_log_cond_probabilities (word_tag_list, "columns", tag_word_counts)
+    emission_probabilities = calculate_log_cond_probabilities (word_tag_list, "rows", word_counts)
     ### print ("emission_probabilities[6652]: ", emission_probabilities[6652], "...")
     ### print ("emission_probabilities[11546]: ", emission_probabilities[11546], "...")
 
@@ -497,7 +498,21 @@ def classify_sentence_with_model (model_name, sentence):
         print ("word_index[0]: ", word_index[0])
         if (len(word_index[0]) == 0):
             word_index = np.where(word_list == 'unknown_emission')
-        emission_probabilities_sentence.append(emission_probabilities[word_index[0][0]])
+        # If a word has more than one character, ensure that it cannot be labeled with $( $. $, tags
+        # by reducing probabilities at the corresponding positions
+        # in part of emission_probabilities given to shortened array
+        emission_probabilities_excerpt = emission_probabilities[word_index[0][0]]
+        if (len(word_list[word_index[0][0]]) > 1):
+            # Determine positions of tags $( $. $, in tag_list
+            bracket_index = np.where(tag_list == '$(')
+            point_index = np.where(tag_list == '$.')
+            komma_index = np.where(tag_list == '$,')
+            # Set emission probabilities for these tags to very low levels (to approximately -14.05, far lower than other marginal values)
+            low_prob = math.log(1/(1+100*emission_probabilities.shape[0]))
+            emission_probabilities_excerpt[bracket_index] = low_prob
+            emission_probabilities_excerpt[point_index] = low_prob
+            emission_probabilities_excerpt[komma_index] = low_prob
+        emission_probabilities_sentence.append(emission_probabilities_excerpt)
     emission_probabilities_sentence = np.array(emission_probabilities_sentence)
     # print ("emission_probabilities_sentence: ", emission_probabilities_sentence)
 

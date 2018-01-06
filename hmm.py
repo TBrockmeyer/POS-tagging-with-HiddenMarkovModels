@@ -247,7 +247,6 @@ def create_model_file (text_file, model_name):
     emission_state_pairs_list = txtfile_to_emission_state_list(text_file)
 
     # Show number of emission-state pairs (including single elements, mostly '\n', for now; we'll clean that later)
-    # print (len(emission_state_pairs_list))
 
     # print ("")
 
@@ -538,7 +537,7 @@ def some_string(string):
         # args.cmd_string is then the name of a compressed model file
         given_modelfile = string.split()
 # Creation of a parser to expect arguments in command line
-parser = argparse.ArgumentParser(description='Invoke either model.npz creation or classification of given sentence. \nFormat: either\n<train text_file_name.txt model_name> or\n<classify existing_model_name ``sentence to be classified, in quotation marks´´>', formatter_class=RawTextHelpFormatter)
+parser = argparse.ArgumentParser(description='Invoke either model.npz creation or classification of given sentence. \nFormat: either\n<train text_file_name.txt model_name.npz> or\n<classify existing_model_name.npz ``sentence to be classified, in quotation marks´´>', formatter_class=RawTextHelpFormatter)
 parser.add_argument('cmd_choice')
 parser.add_argument('cmd_string', type=some_string)
 parser.add_argument('cmd_third')
@@ -562,7 +561,7 @@ elif(opt2==True and args.cmd_choice == 'classify'):
     print (viterbi_result_package[0])
     print (viterbi_result_package[1])
 else:
-    print ("Something went wrong. Please check command for formats: Either\n<train text_file_name.txt model_name> or\n<classify existing_model_name 'sentence to be analyzed'>")
+    print ("Something went wrong. Please check command for formats: Either\n<train text_file_name.txt model_name.npz> or\n<classify existing_model_name.npz 'sentence to be analyzed'>")
 # add_argument with command to be processed
 """
 parser1.add_argument(

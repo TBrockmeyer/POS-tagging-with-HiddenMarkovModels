@@ -318,8 +318,8 @@ def create_model_file (text_file, model_name):
 
     # Create matrix of (conditional) transition probabilities
     # The "conditional element"
-    # transition_probabilities = calculate_log_cond_probabilities (tag_tag_list, "rows", tag_1_counts)
-    transition_probabilities = calculate_log_cond_probabilities (tag_tag_list, "columns", tag_2_counts)
+    transition_probabilities = calculate_log_cond_probabilities (tag_tag_list, "rows", tag_1_counts)
+    # transition_probabilities = calculate_log_cond_probabilities (tag_tag_list, "columns", tag_2_counts)
     # print ("transition_probabilities[0:9]: ", transition_probabilities[0:9])
 
     # print ("")
@@ -443,6 +443,7 @@ def classify_sentence_with_model (model_name, sentence):
     #       an element 'unknown emission' to word_list
     word_list = np.append(word_list, ['unknown_emission'])
     #       and a line with marginal probabilities to emission_probabilities
+    
     marginal_probability = []
     for f in range (0, emission_probabilities.shape[1]):
         # Add a marginal probability representing the distribution of tags occurred throughout the training set
@@ -450,7 +451,7 @@ def classify_sentence_with_model (model_name, sentence):
         marginal_probability.append(curr_prob)
     ### print (" marginal_probability: ", marginal_probability)
     #       or: a line with values (1)/(1+number_of_known_emissions) and shape[0] = number_of_states to emission_probabilities
-    # marginal_probability = emission_probabilities.shape[1]*[1/(1+emission_probabilities.shape[0])]
+    #marginal_probability = emission_probabilities.shape[1]*[1/(1+emission_probabilities.shape[0])]
     ### print ("emission_probabilities.shape[0] (aka. number of unique words): ", emission_probabilities.shape[0])
     ### print ("marginal_probability: ", marginal_probability)
     emission_probabilities = np.append(emission_probabilities, [marginal_probability], axis=0)

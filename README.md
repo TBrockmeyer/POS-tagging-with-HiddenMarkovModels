@@ -3,11 +3,17 @@
 This project is part of an NLP course at Universität Würzburg.
 The task is to analyze a given sentence and propose part-of-speech tags, i.e. categories of words.
 E.g., if the underlying model has been trained with a sample of German words and tags as in the file "training_pos.txt" delivered with this project, for the sentence
+
 "Wir rennen oft zum Bus ."
+
 it shall propose a sequence of ideally correct tags:
+
 PPER VVFIN ADV APPRART NN $.
+
 -20.2232178033
+
 (The floating point number is the log likelihood of the tag sequence proposed)
+
 A widely used tag set for the German language can be obtained here: www.ims.uni-stuttgart.de/forschung/ressourcen/lexika/TagSets/stts-table.html
 
 ## Getting Started
